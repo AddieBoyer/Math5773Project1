@@ -1,0 +1,125 @@
+---
+title: "Regression Project 1"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Math5773Proj1vig}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+```
+
+```{r setup}
+library(Math5773Project1Boyer)
+library(Intro2MLR)
+v <- myreadxl("C:/Users/Addie/Documents/R/4773 Directory/Data/K25936_Downloads/Excel/")
+scan<-v$SCAN
+names <-scan$CATEGORY
+hybrid <- v$HYBRID
+tab1 <-xtabs(Number ~ Claim + Model, data = hybrid)
+bonding <-v$BONDING
+tab2 <-xtabs(NUMBER ~ ADHESIVE + ARIScore, data = bonding)
+```
+# One Way
+The first function in this package is meant for the analysis of a one way table of counts. I gives a graph of the proportions from the table with confidence intervals. It defaults to 95% but you can adjust that with the alpha value. The function then runs a chi-squared test for uniformity on the data and it returns a named list of the results.
+```{r}
+oneway <- function(data, catagories,alpha=.05){
+  n <- sum(data)
+  p <- data/n #Turns counts into proportions
+  q <- 1-p
+  var <-(p*q)/n
+  z <- qnorm(1 - alpha/2)
+  lowerbound <- p-z*sqrt(var)#Calculating the lower bound
+  upperbound <- p+z*sqrt(var)#Calculating the upper bound
+  par(mfrow=c(1,1))
+  plot<-barplot(p, names.arg=catagories,density=p*n,ylim=c(0,max(upperbound)),main="Plot of Proportions")
+  mid <-(plot)
+  arrows(mid,p,mid,upperbound, length = .25, angle=90)
+  arrows(mid,p,mid,lowerbound, length = .25, angle=90)
+  abline(h=mean(p))
+  chi<-chisq.test(data)
+  list(chisq=c(chi))
+}
+oneway(scan$NUMBER,scan$CATEGORY)
+```
+The p value of this example is .00199, which is well below the cutoff value of .05, therefore we can reject the null hypothesis that all of the counts are actually the same. This result is confirmed by the plot and the fact that there are at least 2 confidence intervals for the proportions that do not overlap. 
+
+
+
+# Two Way
+
+The second function in this package is meant for the analysis of a two way table of counts.This function takes the data from a two way table, makes plots of the proportions of the marginal distributions of each factor with confidence intervals, makes a plot of the overall distribution with confidence intervals and runs a chi squared test of independence of factors. It then returns a named list of the results.
+```{r}
+twoway <- function(data,nums,cat1,cat2,alpha=.1){
+  n <-sum(nums)
+  c1<-xtabs(nums~cat1)
+  c2<-xtabs(nums~cat2)
+  pc1 <-c1/n
+  pc2 <-c2/n
+  p <-nums/n
+  z <- qnorm(1 - alpha/2)
+
+  par(mfrow=c(1,1))
+#Make plot of one way analysis of the first factor
+  l1 <- pc1-z*sqrt((pc1*(1-pc1))/n)#Calculating the lower bound
+  u1 <- pc1+z*sqrt((pc1*(1-pc1))/n)#Calculating the upper bound
+  plot1<-barplot(pc1,ylim=c(0,max(u1)), main="One Way Plots of Proportions for Factor 1")
+  mid1 <-(plot1)
+  arrows(mid1,pc1,mid1,u1, length = .25, angle=90)
+  arrows(mid1,pc1,mid1,l1, length = .25, angle=90)
+  abline(h=mean(pc1))
+
+  par(mfrow=c(1,1))
+  #Make plot of one way analysis of the second factor
+  l2 <- pc2-z*sqrt((pc2*(1-pc2))/n)#Calculating the lower bound
+  u2 <- pc2+z*sqrt((pc2*(1-pc2))/n)#Calculating the upper bound
+  plot2<-barplot(pc2,ylim=c(0,max(u2)),main="One Way Plot of Proportions for Factor 2")
+  mid2 <-(plot2)
+  arrows(mid2,pc2,mid2,u2, length = .25, angle=90)
+  arrows(mid2,pc2,mid2,l2, length = .25, angle=90)
+  abline(h=mean(pc2))
+
+  par(mfrow=c(1,1))
+  l <- p-z*sqrt((p*(1-p))/n)#Calculating the lower bound
+  u <- p+z*sqrt((p*(1-p))/n)#Calculating the upper bound
+  plot<-barplot(p,names.arg=c("1,1","1,2","2,1","2,2"),ylim=c(0,max(u)),beside=TRUE,main="Two Way Plot of Proportions")
+  mid <-(plot)
+  arrows(mid,p,mid,u, length = .25, angle=90)
+  arrows(mid,p,mid,l, length = .25, angle=90)
+  abline(h=mean(p))
+
+  chi<-chisq.test(nums)
+  list(chisq=c(chi))
+}
+twoway(tab1,hybrid$Number,hybrid$Claim,hybrid$Model)
+```
+The p value given from this function is given as zero, which means we can definitely reject the null hypothesis that the factors are independent. This is a result which makes sense when we look at the plots since none of the confidence intervals are even close to intersecting.
+
+
+# Fisher's
+The final function in this package is meant to analyze a two way table of counts for which the chi-squared test results may not be accurate. The Fisher's exact test is notable in that it can give a p value that does not rely on approximation. Many other hypothesis tests, like the Chi-Squared test, rely on the Central Limit Theorem to give an approximation that gets more accurate as the sample size gets larger. The null hypothesis independence for the Fisher's test leads to the cells of the table being distributed according to the hypergeometric distribution. This function makes one stacked and one beside plot of the data from the two way table given, and uses the Fisher's exact test to analyze data that the chi-squared test cannot be applied to. It then returns a named list of the results of that test. 
+```{r}
+fishies <- function(data){
+  par(mfrow=c(1,1))
+  n <- sum(data)
+  p <- data/n #Turns counts into proportions
+  plot1<-barplot(p,beside=FALSE,main="Two Way Plot of Proportions", legend.text=FALSE)
+  mid1 <-(plot1)
+  abline(h=mean(p))
+  par(mfrow=c(1,1))
+  plot2<-barplot(p,beside=TRUE,main="Two Way Plot of Proportions", legend.text=FALSE)
+  mid2 <-(plot2)
+  abline(h=mean(p))
+  fish<-fisher.test(data)
+  list(fishers<-c(fish))
+
+}
+fishies(tab2)
+```
+The result given by this function is a p value of 0.2616, which is much larger than the cutoff value of .05, therefore we fail to reject the null hypothesis that the factors are independent. This doesn't necessarily mean the the factors are definitively dependent, but it just means we don't have enough information to rule out independence. (In my actual function I included a legend for these plots but I had to take it off when I made this document becasue it was very obstructive.)
